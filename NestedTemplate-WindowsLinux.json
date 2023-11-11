@@ -1,0 +1,292 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "vnetName": {
+            "type": "string",
+            "defaultValue": "VNet-0X",
+            "metadata": {
+                "description": "VNet Name"
+            }
+        },
+        "vnetAddressSpace": {
+            "type": "string",
+            "defaultValue": "10.0.0.0/16",
+            "metadata": {
+                "description": "The address space of the virtual network"
+            }
+        },
+        "osType": {
+            "type": "string",
+            "defaultValue": "Windows",
+            "allowedValues": [ "Windows", "Linux" ],
+            "metadata": {
+                "description": "Operating system type"
+            }
+        },
+        "installWebServices": {
+            "type": "bool",
+            "defaultValue": true,
+            "metadata": {
+                "description": "Choose whether to install a web server or not"
+            }
+        },
+        "defaultSubnetPrefix": {
+            "type": "string",
+            "defaultValue": "10.0.0.0/24",
+            "metadata": {
+                "description": "The address prefix of the default subnet"
+            }
+        },
+        "subnet1AddressPrefix": {
+            "type": "string",
+            "defaultValue": "10.0.1.0/24"
+        },
+        "subnet2AddressPrefix": {
+            "type": "string",
+            "defaultValue": "10.0.2.0/24"
+        },
+        "subnet3AddressPrefix": {
+            "type": "string",
+            "defaultValue": "10.0.3.0/24"
+        },
+        "vmName": {
+            "type": "string",
+            "defaultValue": "VM-0X",
+            "metadata": {
+                "description": "Name of the virtual machine."
+            }
+        },
+        "vmsubnet": {
+            "type": "string",
+            "defaultValue": "subnet1",
+            "metadata": {
+                "description": "Name of the subnet that the VM will be placed in"
+            }
+        },
+        "adminUsername": {
+            "type": "string",
+            "defaultValue": "uX",
+            "metadata": {
+                "description": "Admin username"
+            }
+        },
+        "adminPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Admin password"
+            }
+        },
+        "allowRemoteAccess": {
+            "type": "bool",
+            "defaultValue": true,
+            "metadata": {
+                "description": "Indicate whether to allow RDP access or not"
+            }
+        },
+        "publicIPRequired": {
+            "type": "bool",
+            "defaultValue": true,
+            "metadata": {
+                "description": "Indicate whether to create a public IP or not"
+            }
+        }
+    },
+    "variables": {
+        "scriptName": "installIIS.ps1",
+        "sshSecurityRule": [
+            {
+                "name": "default-allow-ssh",
+                "properties": {
+                    "priority": 1000,
+                    "sourceAddressPrefix": "*",
+                    "protocol": "Tcp",
+                    "destinationPortRange": "22",
+                    "access": "Allow",
+                    "direction": "Inbound",
+                    "sourcePortRange": "*",
+                    "destinationAddressPrefix": "*"
+                }
+            }
+        ],
+        "rdpSecurityRule": [
+            {
+                "name": "default-allow-rdp",
+                "properties": {
+                    "priority": 1001,
+                    "sourceAddressPrefix": "*",
+                    "protocol": "Tcp",
+                    "destinationPortRange": "3389",
+                    "access": "Allow",
+                    "direction": "Inbound",
+                    "sourcePortRange": "*",
+                    "destinationAddressPrefix": "*"
+                }
+            }
+        ],
+        "httpSecurityRule": [
+            {
+                "name": "HTTP",
+                "properties": {
+                    "priority": 310,
+                    "protocol": "TCP",
+                    "access": "Allow",
+                    "direction": "Inbound",
+                    "sourceAddressPrefix": "*",
+                    "sourcePortRange": "*",
+                    "destinationAddressPrefix": "*",
+                    "destinationPortRange": "80"
+                }
+            }
+        ],
+        "baseSecurityRules": [],
+        "emptySecurityRule": [],
+        "baseAndWebRules": "[union(variables('baseSecurityRules'), if(parameters('installWebServices'), variables('httpSecurityRule'), variables('emptySecurityRule')))]",
+        "baseWebAndRemoteRules": "[union(variables('baseAndWebRules'), if(parameters('allowRemoteAccess'), if(equals(parameters('osType'), 'Windows'), variables('rdpSecurityRule'), variables('sshSecurityRule')), variables('emptySecurityRule')))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2019-02-01",
+            "name": "[concat(parameters('vmName'), '-PIP')]",
+            "location": "[resourceGroup().location]",
+            "condition": "[parameters('publicIPRequired')]",
+            "properties": {
+                "publicIPAllocationMethod": "Dynamic"
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2020-11-01",
+            "name": "[concat(parameters('vmName'), '-NSG')]",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "securityRules": "[variables('baseWebAndRemoteRules')]"
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2020-11-01",
+            "name": "[concat(parameters('vnetName'))]",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[parameters('vnetAddressSpace')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "default",
+                        "properties": {
+                            "addressPrefix": "[parameters('defaultSubnetPrefix')]"
+                        }
+                    },
+                    {
+                        "name": "subnet1",
+                        "properties": {
+                            "addressPrefix": "[parameters('subnet1AddressPrefix')]"
+                        }
+                    },
+                    {
+                        "name": "subnet2",
+                        "properties": {
+                            "addressPrefix": "[parameters('subnet2AddressPrefix')]"
+                        }
+                    },
+                    {
+                        "name": "subnet3",
+                        "properties": {
+                            "addressPrefix": "[parameters('subnet3AddressPrefix')]"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2020-11-01",
+            "name": "[concat(parameters('vmName'), '-NIC')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', concat(parameters('vmName'), '-NSG'))]",
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('vnetName'), parameters('vmsubnet'))]"
+                            },
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": "[if(parameters('publicIPRequired'), json(concat('{\"id\": \"', resourceId('Microsoft.Network/publicIPAddresses', concat(parameters('vmName'), '-PIP')), '\"}')), json('null'))]"
+                        }
+                    }
+                ],
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', concat(parameters('vmName'), '-NSG'))]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2020-12-01",
+            "name": "[parameters('vmName')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkInterfaces/', parameters('vmName'), '-NIC')]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "Standard_D2s_v3"
+                },
+                "osProfile": {
+                    "computerName": "[parameters('vmName')]",
+                    "adminUsername": "[parameters('adminUsername')]",
+                    "adminPassword": "[parameters('adminPassword')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[if(equals(parameters('osType'), 'Windows'), 'MicrosoftWindowsServer', 'Canonical')]",
+                        "offer": "[if(equals(parameters('osType'), 'Windows'), 'WindowsServer', 'UbuntuServer')]",
+                        "sku": "[if(equals(parameters('osType'), 'Windows'), '2016-Datacenter', '18.04-LTS')]",
+                        "version": "latest"
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', concat(parameters('vmName'), '-NIC'))]"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "apiVersion": "2020-12-01",
+            "name": "[if(equals(parameters('osType'), 'Windows'), concat(parameters('vmName'), '/installIIS'), concat(parameters('vmName'), '/installApache'))]",
+            "location": "[resourceGroup().location]",
+            "condition": "[and(parameters('installWebServices'), or(equals(parameters('osType'), 'Windows'), equals(parameters('osType'), 'Linux')))]",
+            "dependsOn": [
+                "[concat('Microsoft.Compute/virtualMachines/', parameters('vmName'))]"
+            ],
+            "properties": {
+                "publisher": "[if(equals(parameters('osType'), 'Windows'), 'Microsoft.Compute', 'Microsoft.Azure.Extensions')]",
+                "type": "[if(equals(parameters('osType'), 'Windows'), 'CustomScriptExtension', 'CustomScript')]",
+                "typeHandlerVersion": "[if(equals(parameters('osType'), 'Windows'), '1.10', '2.0')]",
+                "autoUpgradeMinorVersion": true,
+                "settings": {
+                    "fileUris": [
+                        "[if(equals(parameters('osType'), 'Windows'), 'https://raw.githubusercontent.com/BabakAzure/VM-Deployment/main/installIIS.ps1', 'https://raw.githubusercontent.com/BabakAzure/VM-Deployment/main/installApache.sh')]"
+                    ],
+                    "commandToExecute": "[if(equals(parameters('osType'), 'Windows'), concat('powershell -ExecutionPolicy Unrestricted -File ', variables('scriptName')), 'bash installApache.sh')]"
+                }
+            }
+        }
+
+
+    ]
+}

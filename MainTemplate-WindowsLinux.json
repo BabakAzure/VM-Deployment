@@ -1,0 +1,172 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "resourceGroupName": {
+            "type": "string",
+            "defaultValue": "MyDefaultResourceGroup",
+            "metadata": {
+                "description": "Name of the resource group to be created/used."
+            }
+        },
+        "vnetName": {
+            "type": "string",
+            "defaultValue": "VNet-0X",
+            "metadata": {
+                "description": "VNet Name"
+            }
+        },
+        
+        "osType": {
+            "type": "string",
+            "defaultValue": "Windows",
+            "allowedValues": [ "Windows", "Linux" ],
+            "metadata": {
+                "description": "Operating system type"
+            }
+        },
+        "installWebServices": {
+            "type": "bool",
+            "defaultValue": true,
+            "metadata": {
+                "description": "Indicate whether to install a web page or not"
+            }
+        },
+        "vmName": {
+            "type": "string",
+            "defaultValue": "VM-0X",
+            "metadata": {
+                "description": "Name of the virtual machine."
+            }
+        },
+        "vnetAddressSpace": {
+            "type": "string",
+            "defaultValue": "10.0.0.0/16",
+            "metadata": {
+                "description": "The address space of the virtual network"
+            }
+        },
+        "defaultSubnetPrefix": {
+            "type": "string",
+            "defaultValue": "10.0.0.0/24",
+            "metadata": {
+                "description": "The address prefix of the default subnet"
+            }
+        },
+        "subnet1AddressPrefix": {
+            "type": "string",
+            "defaultValue": "10.0.1.0/24"
+        },
+        "subnet2AddressPrefix": {
+            "type": "string",
+            "defaultValue": "10.0.2.0/24"
+        },
+        "subnet3AddressPrefix": {
+            "type": "string",
+            "defaultValue": "10.0.3.0/24"
+        },
+        "vmsubnet": {
+            "type": "string",
+            "defaultValue": "subnet1",
+            "metadata": {
+                "description": "Name of the subnet that the VM will be placed in"
+            }
+        },
+        "adminUsername": {
+            "type": "string",
+            "defaultValue": "uX",
+            "metadata": {
+                "description": "Admin username"
+            }
+        },
+        "adminPassword": {
+            "type": "securestring",
+            "metadata": {
+                "description": "Admin password"
+            }
+        },
+        "allowRemoteAccess": {
+            "type": "bool",
+            "defaultValue": true,
+            "metadata": {
+                "description": "Indicate whether to allow RDP access or not"
+            }
+        },
+        "publicIPRequired": {
+            "type": "bool",
+            "defaultValue": true,
+            "metadata": {
+                "description": "Indicate whether to create a public IP or not"
+            }
+        }
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Resources/resourceGroups",
+            "apiVersion": "2018-05-01",
+            "location": "[deployment().location]",
+            "name": "[parameters('resourceGroupName')]",
+            "properties": {}
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2018-05-01",
+            "name": "nestedTemplate",
+            "resourceGroup": "[parameters('resourceGroupName')]",
+            "dependsOn": [
+                "[concat('Microsoft.Resources/resourceGroups/', parameters('resourceGroupName'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "https://raw.githubusercontent.com/BabakAzure/VM-Deployment/main/NestedTemplate-WindowsLinux.json",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "vnetName": {
+                        "value": "[parameters('vnetName')]"
+                    },
+                    "vmName": {
+                        "value": "[parameters('vmName')]"
+                    },
+                    "osType": {
+                        "value": "[parameters('osType')]"
+                    },
+                    "installWebServices": {
+                        "value": "[parameters('installWebServices')]"
+                    },
+                    "vnetAddressSpace": {
+                        "value": "[parameters('vnetAddressSpace')]"
+                    },
+                    "defaultSubnetPrefix": {
+                        "value": "[parameters('defaultSubnetPrefix')]"
+                    },
+                    "subnet1AddressPrefix": {
+                        "value": "[parameters('subnet1AddressPrefix')]"
+                    },
+                    "subnet2AddressPrefix": {
+                        "value": "[parameters('subnet2AddressPrefix')]"
+                    },
+                    "subnet3AddressPrefix": {
+                        "value": "[parameters('subnet3AddressPrefix')]"
+                    },
+                    "vmsubnet": {
+                        "value": "[parameters('vmsubnet')]"
+                    },
+                    "adminUsername": {
+                        "value": "[parameters('adminUsername')]"
+                    },
+                    "adminPassword": {
+                        "value": "[parameters('adminPassword')]"
+                    },
+                    "allowRemoteAccess": {
+                        "value": "[parameters('allowRemoteAccess')]"
+                    },
+                    "publicIPRequired": {
+                        "value": "[parameters('publicIPRequired')]"
+                    }
+                }
+            }
+        }
+    ]
+}
